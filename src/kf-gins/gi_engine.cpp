@@ -184,9 +184,9 @@ void GIEngine::insPropagation(IMU &imupre, IMU &imucur) {
     // 初始化Phi阵(状态转移矩阵)，F阵，Qd阵(传播噪声阵)，G阵(噪声驱动阵)
     // initialize Phi (state transition), F matrix, Qd(propagation noise) and G(noise driven) matrix
     Phi.resizeLike(Cov_);
-    F.resizeLike(Cov_);
+    F.resizeLike(Cov_); // rows = 21 , cols = 21
     Qd.resizeLike(Cov_);
-    G.resize(RANK, NOISERANK);
+    G.resize(RANK, NOISERANK); // (21, 18)
     Phi.setIdentity();
     F.setZero();
     Qd.setZero();
@@ -287,7 +287,7 @@ void GIEngine::insPropagation(IMU &imupre, IMU &imucur) {
     // 状态转移矩阵
     // compute the state transition matrix
     Phi.setIdentity();
-    Phi = Phi + F * imucur.dt;
+    Phi = Phi + F * imucur.dt; // 连续时间方程离散化
 
     // 计算系统传播噪声
     // compute system propagation noise
@@ -312,20 +312,21 @@ void GIEngine::gnssUpdate(GNSS &gnssdata) {
     // GNSS位置测量新息
     // compute GNSS position innovation
     Eigen::MatrixXd dz;
-    dz = Dr * (antenna_pos - gnssdata.blh);
+    dz = Dr * (antenna_pos - gnssdata.blh); //3x1  GNSS 位置和 转化杆臂后的IMU位置（就是惯导位置） 的差值
 
     // 构造GNSS位置观测矩阵
     // construct GNSS position measurement matrix
     Eigen::MatrixXd H_gnsspos;
-    H_gnsspos.resize(3, Cov_.rows());
+    H_gnsspos.resize(3, Cov_.rows()); // H_gnsspos:3x21  Cov_:21x21
     H_gnsspos.setZero();
-    H_gnsspos.block(0, P_ID, 3, 3)   = Eigen::Matrix3d::Identity();
-    H_gnsspos.block(0, PHI_ID, 3, 3) = Rotation::skewSymmetric(pvacur_.att.cbn * options_.antlever);
+    H_gnsspos.block(0, P_ID, 3, 3)   = Eigen::Matrix3d::Identity(); // P_ID 为位置ID
+    // 姿态部分是0？
+    H_gnsspos.block(0, PHI_ID, 3, 3) = Rotation::skewSymmetric(pvacur_.att.cbn * options_.antlever); // 生成反对称矩阵, cbn 3x3  antlever 3x1
 
     // 位置观测噪声阵
     // construct measurement noise matrix
     Eigen::MatrixXd R_gnsspos;
-    R_gnsspos = gnssdata.std.cwiseProduct(gnssdata.std).asDiagonal();
+    R_gnsspos = gnssdata.std.cwiseProduct(gnssdata.std).asDiagonal(); // 根据gnss data 的std 构造噪声矩阵
 
     // EKF更新协方差和误差状态
     // do EKF update to update covariance and error state
@@ -365,6 +366,11 @@ void GIEngine::EKFPredict(Eigen::MatrixXd &Phi, Eigen::MatrixXd &Qd) {
     // 传播系统协方差和误差状态
     // propagate system covariance and error state
     Cov_ = Phi * Cov_ * Phi.transpose() + Qd;
+    for (int i = 0; i < dx_.rows(); ++i) {
+        std::cout << "EKF Predict dx_(" << i << ") = " << dx_(i, 0) << std::endl; //  dx_(i, 0) 都为0
+    }
+
+    // std::cout << "EKF Predict dx_:"<< dx_ << std::endl;
     dx_  = Phi * dx_;
 }
 
@@ -378,18 +384,31 @@ void GIEngine::EKFUpdate(Eigen::MatrixXd &dz, Eigen::MatrixXd &H, Eigen::MatrixX
     // 计算Kalman增益
     // Compute Kalman Gain
     auto temp         = H * Cov_ * H.transpose() + R;
-    Eigen::MatrixXd K = Cov_ * H.transpose() * temp.inverse();
+    Eigen::MatrixXd K = Cov_ * H.transpose() * temp.inverse(); // 21 x 3
 
     // 更新系统误差状态和协方差
     // update system error state and covariance
     Eigen::MatrixXd I;
     I.resizeLike(Cov_);
     I.setIdentity();
-    I = I - K * H;
-    // 如果每次更新后都进行状态反馈，则更新前dx_一直为0，下式可以简化为：dx_ = K * dz;
+    I = I - K * H;  //
+    std::cout<<K<<std::endl;
+    std::cout<<H<<std::endl;
+    // 如果每次更新后都进行状态反馈，则更新前dx_一直为0，下式可以简化为：dx_ = K * dz; =》 相当于部分信任误差状态
     // if state feedback is performed after every update, dx_ is always zero before the update
     // the following formula can be simplified as : dx_ = K * dz;
-    dx_  = dx_ + K * (dz - H * dx_);
+    // for (int i = 0; i < dx_.rows(); ++i) {
+    //     std::cout << "EKF update dx_ before (" << i << ") = " << dx_(i, 0) << std::endl;  //  dx_(i, 0) 这里也都是为0
+    // }
+    /*
+    这里dz 是gnss和惯导的位置误差， 与k做矩阵乘法后得到的dx 理解上都是和位置相关的， 用状态减去dx 更新offset 的合理性？
+    */
+    dx_  = dx_ + K * (dz - H * dx_); // 更新dx_ 后dx_不为0   21x1 = 21x1 + 21x3 * 3x1
+    // for (int i = 0; i < dx_.rows(); ++i) {
+    //     std::cout << "EKF update dx_ after(" << i << ") = " << dx_(i, 0) << std::endl;  //  dx_(i, 0) 这里也都是为0
+    // }
+    std::cout<< "Trans matrix H: ";
+
     Cov_ = I * Cov_ * I.transpose() + K * R * K.transpose();
 }
 
@@ -399,9 +418,10 @@ void GIEngine::stateFeedback() {
 
     // 位置误差反馈
     // posisiton error feedback
-    Eigen::Vector3d delta_r = dx_.block(P_ID, 0, 3, 1);
+    Eigen::Vector3d delta_r = dx_.block(P_ID, 0, 3, 1); // delta_r 值不为0
+    std::cout << "stateFeedback Position error:" << delta_r <<std::endl;
     Eigen::Matrix3d Dr_inv  = Earth::DRi(pvacur_.pos);
-    pvacur_.pos -= Dr_inv * delta_r;
+    pvacur_.pos -= Dr_inv * delta_r;  // 直接减的话存不存在正负的问题
 
     // 速度误差反馈
     // velocity error feedback

@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
     // data alignment
     IMU imu_cur;
     do {
-        imu_cur = imufile.next();
+        imu_cur = imufile.next(); // 单次三轴加速度和三轴角速度
     } while (imu_cur.time < starttime);
 
     GNSS gnss;
@@ -143,6 +143,7 @@ int main(int argc, char *argv[]) {
 
     // 添加IMU数据到GIEngine中，补偿IMU误差
     // add imudata to GIEngine and compensate IMU error
+    // 先填初始gnss 和imu数据
     giengine.addImuData(imu_cur, true);
 
     // 添加GNSS数据到GIEngine
