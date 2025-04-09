@@ -1,0 +1,66 @@
+# KF-GINS Configuration File
+
+# Path to input and output files
+imupath: "./data/imu.txt"    # IMU data file
+gnsspath: "./data/gnss.txt"  # GNSS data file
+outputpath: "./results"      # Results directory
+
+# IMU data configuration
+imudatalen: 7          # IMU data columns
+imudatarate: 200       # IMU data rate in Hz
+starttime: 0.0         # Start time in seconds
+endtime: 310.0         # End time in seconds (-1 = process all data)
+
+# Initial position, velocity and attitude
+# Position in degrees (latitude, longitude) and meters (height)
+initpos: [39.9736, 116.3670, 39.9214]   # Lat, Lon, Height
+# Velocity in m/s (north, east, down)
+initvel: [0, 0, 0]                      # Vn, Ve, Vd
+# Attitude in degrees
+initatt: [0, 0, 0]                      # Roll, Pitch, Yaw
+
+# Initial IMU error states
+# Gyroscope bias in deg/h
+initgyrbias: [0, 0, 0]
+# Accelerometer bias in mGal
+initaccbias: [0, 0, 0]
+# Gyroscope scale factors in ppm
+initgyrscale: [0, 0, 0]
+# Accelerometer scale factors in ppm
+initaccscale: [0, 0, 0]
+
+# Initial state standard deviations
+# Position std in meters
+initposstd: [5, 5, 5]
+# Velocity std in m/s
+initvelstd: [0.5, 0.5, 0.5]
+# Attitude std in degrees
+initattstd: [1, 1, 5]
+# Gyroscope bias std in deg/h
+gyrbiasstd: [100, 100, 100]
+# Accelerometer bias std in mGal
+accbiasstd: [10000, 10000, 10000]
+# Gyroscope scale factor std in ppm
+gyrscalestd: [1000, 1000, 1000]
+# Accelerometer scale factor std in ppm
+accscalestd: [1000, 1000, 1000]
+
+# IMU noise parameters
+imunoise:
+  # Angle random walk in deg/sqrt(h)
+  arw: [0.5, 0.5, 0.5]
+  # Velocity random walk in m/s/sqrt(h) 
+  vrw: [0.5, 0.5, 0.5]
+  # Gyroscope bias stability in deg/h
+  gbstd: [50, 50, 50]
+  # Accelerometer bias stability in mGal
+  abstd: [5000, 5000, 5000]
+  # Gyroscope scale factor stability in ppm
+  gsstd: [300, 300, 300]
+  # Accelerometer scale factor stability in ppm
+  asstd: [300, 300, 300]
+  # Correlation time in hours
+  corrtime: 1.0
+
+# GNSS antenna lever arm in meters (body frame)
+antlever: [0, 0, 0] 
