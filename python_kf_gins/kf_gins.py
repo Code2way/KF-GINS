@@ -260,7 +260,7 @@ def main():
     if endtime < 0:
         endtime = imufile.endtime()
     
-    if endtime > 604800 or starttime < imufile.starttime() or starttime > endtime:
+    if endtime > 0 or starttime < imufile.starttime() or starttime > endtime:
         print("Process time ERROR!")
         return -1
     
