@@ -39,16 +39,21 @@ public:
         data_ = load();
 
         gnss_.time = data_[0];
+        gnss_.utctime[0] = (int) data_[7]; // hour
+        gnss_.utctime[1] = (int) data_[8]; // min
+        gnss_.utctime[2] = (int) data_[9]; // sec
+        gnss_.utctime[3] = (int) data_[10]; // millisecond
         memcpy(gnss_.blh.data(), &data_[1], 3 * sizeof(double));
-
+        memcpy(gnss_.std.data(), &data_[4], 3 * sizeof(double));
         // 13列GNSS文件包含GNSS速度
-        if (data_.size() == 7) {
-            memcpy(gnss_.std.data(), &data_[4], 3 * sizeof(double));
-        } else {
-            memcpy(gnss_.std.data(), &data_[7], 3 * sizeof(double));
-        }
+        // if (data_.size() == 7) {
+        //     memcpy(gnss_.std.data(), &data_[4], 3 * sizeof(double));
+        // } else {
+        //     memcpy(gnss_.std.data(), &data_[7], 3 * sizeof(double));
+        // }
         gnss_.blh[0] *= D2R;
         gnss_.blh[1] *= D2R;
+
 
         return gnss_;
     }

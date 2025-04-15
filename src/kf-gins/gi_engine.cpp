@@ -366,9 +366,9 @@ void GIEngine::EKFPredict(Eigen::MatrixXd &Phi, Eigen::MatrixXd &Qd) {
     // 传播系统协方差和误差状态
     // propagate system covariance and error state
     Cov_ = Phi * Cov_ * Phi.transpose() + Qd;
-    for (int i = 0; i < dx_.rows(); ++i) {
-        std::cout << "EKF Predict dx_(" << i << ") = " << dx_(i, 0) << std::endl; //  dx_(i, 0) 都为0
-    }
+    // for (int i = 0; i < dx_.rows(); ++i) {
+    //     std::cout << "EKF Predict dx_(" << i << ") = " << dx_(i, 0) << std::endl; //  dx_(i, 0) 都为0
+    // }
 
     // std::cout << "EKF Predict dx_:"<< dx_ << std::endl;
     dx_  = Phi * dx_;
@@ -392,8 +392,8 @@ void GIEngine::EKFUpdate(Eigen::MatrixXd &dz, Eigen::MatrixXd &H, Eigen::MatrixX
     I.resizeLike(Cov_);
     I.setIdentity();
     I = I - K * H;  //
-    std::cout<<K<<std::endl;
-    std::cout<<H<<std::endl;
+    // std::cout<<K<<std::endl;
+    // std::cout<<H<<std::endl;
     // 如果每次更新后都进行状态反馈，则更新前dx_一直为0，下式可以简化为：dx_ = K * dz; =》 相当于部分信任误差状态
     // if state feedback is performed after every update, dx_ is always zero before the update
     // the following formula can be simplified as : dx_ = K * dz;
@@ -407,7 +407,6 @@ void GIEngine::EKFUpdate(Eigen::MatrixXd &dz, Eigen::MatrixXd &H, Eigen::MatrixX
     // for (int i = 0; i < dx_.rows(); ++i) {
     //     std::cout << "EKF update dx_ after(" << i << ") = " << dx_(i, 0) << std::endl;  //  dx_(i, 0) 这里也都是为0
     // }
-    std::cout<< "Trans matrix H: ";
 
     Cov_ = I * Cov_ * I.transpose() + K * R * K.transpose();
 }
@@ -419,7 +418,7 @@ void GIEngine::stateFeedback() {
     // 位置误差反馈
     // posisiton error feedback
     Eigen::Vector3d delta_r = dx_.block(P_ID, 0, 3, 1); // delta_r 值不为0
-    std::cout << "stateFeedback Position error:" << delta_r <<std::endl;
+    //std::cout << "stateFeedback Position error:" << delta_r <<std::endl;
     Eigen::Matrix3d Dr_inv  = Earth::DRi(pvacur_.pos);
     pvacur_.pos -= Dr_inv * delta_r;  // 直接减的话存不存在正负的问题
 

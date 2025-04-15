@@ -30,8 +30,8 @@ using Eigen::Quaterniond;
 using Eigen::Vector3d;
 
 typedef struct GNSS {
-    double time;
-
+    double time;  // timestamp
+    int utctime[4];    // time interval
     Vector3d blh;
     Vector3d std;
 

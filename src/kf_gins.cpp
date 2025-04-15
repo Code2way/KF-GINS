@@ -34,7 +34,7 @@
 #include "kf-gins/gi_engine.h"
 
 bool loadConfig(YAML::Node &config, GINSOptions &options);
-void writeNavResult(double time, NavState &navstate, FileSaver &navfile, FileSaver &imuerrfile);
+void writeNavResult(int time[], NavState &navstate, FileSaver &navfile, FileSaver &imuerrfile);
 void writeSTD(double time, Eigen::MatrixXd &cov, FileSaver &stdfile);
 
 int main(int argc, char *argv[]) {
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     // imuerrfile: time(1) + gyrbias(3) + accbias(3) + gyrscale(3) + accscale(3) = 13
     // stdfile: time(1) + pva_std(9) + imubias_std(6) + imuscale_std(6) = 22
     int nav_columns = 11, imuerr_columns = 13, std_columns = 22;
-    FileSaver navfile(outputpath + "/KF_GINS_Navresult.nav", nav_columns, FileSaver::TEXT);
+    FileSaver navfile(outputpath + "/KF_GINS_Navresult.log", nav_columns, FileSaver::TEXT);
     FileSaver imuerrfile(outputpath + "/KF_GINS_IMU_ERR.txt", imuerr_columns, FileSaver::TEXT);
     FileSaver stdfile(outputpath + "/KF_GINS_STD.txt", std_columns, FileSaver::TEXT);
 
@@ -124,7 +124,8 @@ int main(int argc, char *argv[]) {
     if (endtime < 0) {
         endtime = imufile.endtime();
     }
-    if (endtime > 604800 || starttime < imufile.starttime() || starttime > endtime) {
+    if (endtime > 99999999999 || starttime < imufile.starttime() || starttime > endtime) {
+
         std::cout << "Process time ERROR!" << std::endl;
         return -1;
     }
@@ -160,13 +161,16 @@ int main(int argc, char *argv[]) {
     // used to display processing progress
     int percent = 0, lastpercent = 0;
     double interval = endtime - starttime;
-
+    bool gnssUpdate = false;
     while (true) {
         // 当前IMU状态时间新于GNSS时间时，读取并添加新的GNSS数据到GIEngine
         // load new gnssdata when current state time is newer than GNSS time and add it to GIEngine
+        gnssUpdate = false;
         if (gnss.time < imu_cur.time && !gnssfile.isEof()) {
             gnss = gnssfile.next();
             giengine.addGnssData(gnss);
+            gnssUpdate = true;
+
         }
 
         // 读取并添加新的IMU数据到GIEngine
@@ -189,8 +193,11 @@ int main(int argc, char *argv[]) {
 
         // 保存处理结果
         // save processing results
-        writeNavResult(timestamp, navstate, navfile, imuerrfile);
-        writeSTD(timestamp, cov, stdfile);
+        if (gnssUpdate) {
+            writeNavResult(&gnss.utctime[0], navstate, navfile, imuerrfile);
+            writeSTD(timestamp, cov, stdfile);
+        }
+
 
         // 显示处理进展
         // display processing progress
@@ -365,31 +372,76 @@ bool loadConfig(YAML::Node &config, GINSOptions &options) {
  * @brief 保存导航结果和IMU误差，已转换为常用单位
  *        save navigation result and imu error, converted them to common units
  * */
-void writeNavResult(double time, NavState &navstate, FileSaver &navfile, FileSaver &imuerrfile) {
+void writeNavResult(int time[], NavState &navstate, FileSaver &navfile, FileSaver &imuerrfile) {
 
     std::vector<double> result;
 
-    // 保存导航结果
-    // save navigation result
-    result.clear();
-    result.push_back(0);
-    result.push_back(time);
-    result.push_back(navstate.pos[0] * R2D);
-    result.push_back(navstate.pos[1] * R2D);
-    result.push_back(navstate.pos[2]);
-    result.push_back(navstate.vel[0]);
-    result.push_back(navstate.vel[1]);
-    result.push_back(navstate.vel[2]);
-    result.push_back(navstate.euler[0] * R2D);
-    result.push_back(navstate.euler[1] * R2D);
-    result.push_back(navstate.euler[2] * R2D);
-    navfile.dump(result);
+    // 生成GPRMC格式的NMEA语句
+    // Generate GPRMC format NMEA sentence
 
-    // 保存IMU误差
-    // save IMU error
+    // 计算时间格式
+    // Calculate time format (hhmmss.sss)
+    // int week = (int)time / 604800;
+    // double sow = time - week * 604800.0;
+    // int hour = (int)(sow / 3600);
+    // int minute = (int)((sow - hour * 3600) / 60);
+    // double second = sow - hour * 3600 - minute * 60;
+
+    // 格式化时间为HHMMSS.SSS
+    char time_str[20];
+    sprintf(time_str, "%02d%02d%02d.%03d", time[0],  time[1],  time[2],time[3]);
+
+    // 计算日期格式 (ddmmyy)
+    // 这里简化处理，使用固定日期 - 实际应用中应计算真实日期
+    // TODO: 从GPS周和周内秒计算实际日期
+    char date_str[20] = "080124"; // 格式为 DDMMYY，这里使用固定值，需根据实际修改
+
+    // 格式化纬度
+    double lat_abs = fabs(navstate.pos[0] * R2D);
+    int lat_deg = (int)lat_abs;
+    double lat_min = (lat_abs - lat_deg) * 60.0;
+    char lat_dir = (navstate.pos[0] >= 0.0) ? 'N' : 'S';
+
+    // 格式化经度
+    double lon_abs = fabs(navstate.pos[1] * R2D);
+    int lon_deg = (int)lon_abs;
+    double lon_min = (lon_abs - lon_deg) * 60.0;
+    char lon_dir = (navstate.pos[1] >= 0.0) ? 'E' : 'W';
+
+    // 计算速度（节）和航向
+    double speed_knots = sqrt(navstate.vel[0] * navstate.vel[0] + navstate.vel[1] * navstate.vel[1]) * 1.94384; // m/s转节
+    double course = atan2(navstate.vel[1], navstate.vel[0]) * R2D;
+    if (course < 0) {
+        course += 360.0;
+    }
+
+    // 构建GPRMC语句
+    char nmea[256];
+    sprintf(nmea, "$GPRMC,%s,A,%02d%09.6f,%c,%03d%09.6f,%c,%.2f,%.2f,%s,,,A",
+            time_str, lat_deg, lat_min, lat_dir, lon_deg, lon_min, lon_dir,
+            speed_knots, course, date_str);
+
+    // 计算校验和
+    unsigned char checksum = 0;
+    for (int i = 1; i < strlen(nmea); i++) {
+        checksum ^= nmea[i];
+    }
+
+    // 添加校验和
+    char final_nmea[300];
+    sprintf(final_nmea, "%s*%02X", nmea, checksum);
+
+    // 保存NMEA语句到文件
+    // Save NMEA sentence to file
+    std::vector<std::string> nmea_result;
+    nmea_result.push_back(final_nmea);
+    navfile.dump(nmea_result);
+
+    // 保存IMU误差 (保持不变)
+    // save IMU error (unchanged)
     auto imuerr = navstate.imuerror;
     result.clear();
-    result.push_back(time);
+    // result.push_back(time);
     result.push_back(imuerr.gyrbias[0] * R2D * 3600);
     result.push_back(imuerr.gyrbias[1] * R2D * 3600);
     result.push_back(imuerr.gyrbias[2] * R2D * 3600);

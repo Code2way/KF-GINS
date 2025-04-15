@@ -41,6 +41,8 @@ public:
 
     void dump(const vector<double> &data);
     void dumpn(const vector<vector<double>> &data);
+    
+    void dump(const vector<string> &data);
 
 private:
     void dump_(const vector<double> &data);

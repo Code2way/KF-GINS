@@ -42,6 +42,15 @@ void FileSaver::dump(const vector<double> &data) {
     dump_(data);
 }
 
+void FileSaver::dump(const vector<string> &data) {
+    if (filetype_ == TEXT) {
+        for (const auto &str : data) {
+            filefp_ << str << "\n";
+        }
+    }
+    // Binary mode not supported for string data
+}
+
 void FileSaver::dumpn(const vector<vector<double>> &data) {
     for (const auto &k : data) {
         dump_(k);
