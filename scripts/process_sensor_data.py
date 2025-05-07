@@ -35,7 +35,7 @@ df_selected[['timestamp']] = df_selected[['timestamp']] / 1000  # 将时间戳�
 df_selected[['Gyro.x', 'Gyro.y']] = df_selected[['Gyro.y', 'Gyro.x']]
 df_selected['Gyro.z'] = -df_selected['Gyro.z']
 
-# 交换 Gsns 的 x、y 轴并将 z 轴取反
+# # 交换 Gsns 的 x、y 轴并将 z 轴取反
 df_selected[['Gsns.x', 'Gsns.y']] = df_selected[['Gsns.y', 'Gsns.x']]
 df_selected['Gsns.z'] = -df_selected['Gsns.z']
 

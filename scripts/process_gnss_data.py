@@ -78,9 +78,9 @@ def parse_gnss_log(input_file, output_file):
                                 lat,
                                 lon,
                                 alt,
-                                lat_std,
-                                lon_std,
-                                alt_std,
+                                lat_std / 10,
+                                lon_std / 10,
+                                alt_std / 10,
                                 hour,      # 时
                                 minute,    # 分
                                 second,    # 秒

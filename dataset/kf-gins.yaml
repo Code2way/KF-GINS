@@ -29,7 +29,7 @@ endtime: -1
 # initial state
 # 初始位置, 纬度 经度 高程
 # initial position, latitude, longitude, altitude. [deg, deg, m]
-initpos: [ 30.4447873701, 114.4718632047, 20.899 ]
+initpos: [37.405028333333334 ,127.11792666666666 ,39.9 ]
 
 # 初始速度, 北向速度, 东向速度, 垂向速度
 # initial velocity, speed in the directions of north, east and down. [m/s, m/s, m/s]
