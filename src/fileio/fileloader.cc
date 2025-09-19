@@ -86,14 +86,14 @@ bool FileLoader::load_() {
     if (isEof())
         return false;
 
-    data_.resize(columns_);
+    // data_.resize(columns_);
 
     if (filetype_ == TEXT) {
         string line;
         std::getline(filefp_, line);
         if (line.empty())
             return false;
-
+        // std::cout<<line<<std::endl;
         vector<string> splits = absl::StrSplit(line, absl::ByAnyChar(", \t"), absl::SkipWhitespace());
 
         data_.clear();

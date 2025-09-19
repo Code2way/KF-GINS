@@ -24,12 +24,58 @@
 #define GI_ENGINE_H
 
 #include <Eigen/Dense>
+#include <memory>
 #include <vector>
-
+#include <deque>
 #include "common/types.h"
 
 #include "kf_gins_types.h"
 
+const int IMU_BUFFER_CNT = 10;  // 最大IMU数据缓存数
+const int GPS_BUFFER_CNT = 10; // 最大GNSS数据缓存数
+const int GNSS_DETECT_STRIGHT_TIME = 3; // GNSS 连续检测到直线的时间阈值，单位：秒
+
+class GPSBuffer
+{
+private:
+// 问题是命名空间 std 中没有模板名 'deque'，需要包含 <deque> 头文件
+    std::deque<GNSS> buffer;
+    const size_t max_size;
+
+public:
+    GPSBuffer(size_t size) : max_size(size) {};
+
+    void addData(const GNSS& new_data) {
+        buffer.push_back(new_data);
+        if (buffer.size() > max_size) {
+            buffer.pop_front();
+        }
+    };
+};
+class IMUBuffer
+{
+private:
+    std::deque<IMU> buffer;
+    const size_t max_size;
+
+public:
+    IMUBuffer(size_t size) : max_size(size) {};
+
+    void addData(const IMU& new_data) {
+        buffer.push_back(new_data);
+        if (buffer.size() > max_size) {
+            buffer.pop_front();
+        }
+    };
+};
+
+/**
+ * @brief GNSS/INS融合引擎
+ *        GNSS/INS fusion engine
+/**
+ * @brief GIEngine类，提供GNSS/INS融合的接口
+ *        GIEngine class, provide the interface for GNSS/INS fusion
+ * */
 class GIEngine {
 
 public:
@@ -50,6 +96,11 @@ public:
         imupre_ = imucur_;
         imucur_ = imu;
 
+        imu_buffer.push_back(imucur_);
+        if (imu_buffer.size() > IMU_BUFFER_CNT) {
+            imu_buffer.pop_front();
+        }
+
         if (compensate) {
             imuCompensate(imucur_);
         }
@@ -67,6 +118,13 @@ public:
         // 暂不进行数据有效性检查，GNSS数据默认有效
         // do not check the validity of gnssdata, the gnssdata is valid by default
         gnssdata_.isvalid = true;
+
+        gnss_buffer.push_back(gnssdata_);
+        // std::cout <<"gnssdata_"<< gnssdata_.blh[0] << " " << gnssdata_.blh[1] << " " << gnssdata_.blh[2] << std::endl;
+        if (gnss_buffer.size() > GPS_BUFFER_CNT) {
+            gnss_buffer.pop_front();
+        }
+
     }
 
     /**
@@ -126,7 +184,12 @@ public:
     Eigen::MatrixXd getCovariance() {
         return Cov_;
     }
+    
+    void navi_init();
 
+
+    double computeBearing(const GNSS& start, const GNSS& end) const ;
+  
 private:
     /**
      * @brief 初始化系统状态和协方差
@@ -137,7 +200,7 @@ private:
      *                           initial state std
      * */
     void initialize(const NavState &initstate, const NavState &initstate_std);
-
+    
     /**
      * @brief 当前IMU误差补偿到IMU数据中
      *        componsate imu error to the imudata
@@ -230,6 +293,7 @@ private:
 
     double timestamp_;
 
+    bool  init_status;
     // 更新时间对齐误差，IMU状态和观测信息误差小于它则认为两者对齐
     // updata time align error
     const double TIME_ALIGN_ERR = 0.001;
@@ -239,6 +303,10 @@ private:
     IMU imupre_;
     IMU imucur_;
     GNSS gnssdata_;
+
+
+    std::deque<IMU>  imu_buffer; // IMU数据缓存
+    std::deque<GNSS> gnss_buffer; // GNSS数据缓存
 
     // IMU状态（位置、速度、姿态和IMU误差）
     // imu state (position, velocity, attitude and imu error)

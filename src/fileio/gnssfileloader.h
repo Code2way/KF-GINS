@@ -26,7 +26,7 @@
 #include "common/angle.h"
 #include "common/types.h"
 #include "fileloader.h"
-
+#include <iostream>
 class GnssFileLoader : public FileLoader {
 
 public:
@@ -37,7 +37,7 @@ public:
 
     const GNSS &next() {
         data_ = load();
-
+        // std::cout << "data_: " << data_[1] << " " << data_[2] << " " << data_[3] << std::endl;
         gnss_.time = data_[0];
         gnss_.utctime[0] = (int) data_[7]; // hour
         gnss_.utctime[1] = (int) data_[8]; // min

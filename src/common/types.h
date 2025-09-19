@@ -24,17 +24,30 @@
 #define TYPES_H
 
 #include <Eigen/Geometry>
+#include <sys/types.h>
 
 using Eigen::Matrix3d;
 using Eigen::Quaterniond;
 using Eigen::Vector3d;
 
 typedef struct GNSS {
+    GNSS() : 
+        time(0.0),
+        utctime{0},
+        blh(Vector3d::Zero()),
+        std(Vector3d::Zero()),
+        direction(0.0),
+        gps_speed(0.0),
+        fix_type(0),
+        isvalid(false) {}
+    
     double time;  // timestamp
     int utctime[4];    // time interval
     Vector3d blh;
     Vector3d std;
-
+    double direction;
+    double gps_speed;
+    uint8_t fix_type;
     bool isvalid;
 } GNSS;
 

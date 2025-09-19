@@ -30,7 +30,9 @@ void INSMech::insMech(const PVA &pvapre, PVA &pvacur, const IMU &imupre, const I
     // perform velocity update, position updata and attitude update in sequence, irreversible order
     // 依次进行速度更新、位置更新、姿态更新, 不可调换顺序
     velUpdate(pvapre, pvacur, imupre, imucur);
+    std::cout << "pvapre.pos: " << pvapre.pos[0] * 180/3.14<<" "<<pvapre.pos[1] * 180/3.14 << std::endl;
     posUpdate(pvapre, pvacur, imupre, imucur);
+    std::cout << "pvapcur.pos: " << pvacur.pos[0] * 180/3.14 <<" "<<pvacur.pos[1] * 180/3.14<< std::endl;
     attUpdate(pvapre, pvacur, imupre, imucur);
 }
 

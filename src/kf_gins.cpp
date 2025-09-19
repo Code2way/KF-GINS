@@ -138,6 +138,7 @@ int main(int argc, char *argv[]) {
     } while (imu_cur.time < starttime);
 
     GNSS gnss;
+    // 读取并跳过GNSS数据，直到找到起始时间大于等于starttime的GNSS数据
     do {
         gnss = gnssfile.next();
     } while (gnss.time <= starttime);
@@ -167,10 +168,11 @@ int main(int argc, char *argv[]) {
         // load new gnssdata when current state time is newer than GNSS time and add it to GIEngine
         gnssUpdate = false;
         if (gnss.time < imu_cur.time && !gnssfile.isEof()) {
+            gnss = GNSS();
             gnss = gnssfile.next();
             giengine.addGnssData(gnss);
             gnssUpdate = true;
-
+            giengine.navi_init();
         }
 
         // 读取并添加新的IMU数据到GIEngine
@@ -399,6 +401,9 @@ void writeNavResult(int time[], NavState &navstate, FileSaver &navfile, FileSave
     // 格式化纬度
     double lat_abs = fabs(navstate.pos[0] * R2D);
     int lat_deg = (int)lat_abs;
+    if (lat_deg == 0) {
+        return;
+    }
     double lat_min = (lat_abs - lat_deg) * 60.0;
     char lat_dir = (navstate.pos[0] >= 0.0) ? 'N' : 'S';
 

@@ -24,14 +24,18 @@
 #include "common/rotation.h"
 
 #include "gi_engine.h"
+#include "common/types.h"
 #include "insmech.h"
+#include <cstddef>
+#include <iostream>
+#include <vector>
 
 GIEngine::GIEngine(GINSOptions &options) {
 
     this->options_ = options;
     options_.print_options();
     timestamp_ = 0;
-
+    init_status = false;
     // 设置协方差矩阵，系统噪声阵和系统误差状态矩阵大小
     // resize covariance matrix, system noise matrix, and system error state matrix
     Cov_.resize(RANK, RANK);
@@ -64,18 +68,18 @@ void GIEngine::initialize(const NavState &initstate, const NavState &initstate_s
 
     // 初始化位置、速度、姿态
     // initialize position, velocity and attitude
-    pvacur_.pos       = initstate.pos;
-    pvacur_.vel       = initstate.vel;
-    pvacur_.att.euler = initstate.euler;
-    pvacur_.att.cbn   = Rotation::euler2matrix(pvacur_.att.euler);
-    pvacur_.att.qbn   = Rotation::euler2quaternion(pvacur_.att.euler);
+    // pvacur_.pos       = initstate.pos;
+    // pvacur_.vel       = initstate.vel;
+    // pvacur_.att.euler = initstate.euler;
+    // pvacur_.att.cbn   = Rotation::euler2matrix(pvacur_.att.euler);
+    // pvacur_.att.qbn   = Rotation::euler2quaternion(pvacur_.att.euler);
     // 初始化IMU误差
     // initialize imu error
     imuerror_ = initstate.imuerror;
 
     // 给上一时刻状态赋同样的初值
     // set the same value to the previous state
-    pvapre_ = pvacur_;
+    // pvapre_ = pvacur_;
 
     // 初始化协方差
     // initialize covariance
@@ -90,7 +94,9 @@ void GIEngine::initialize(const NavState &initstate, const NavState &initstate_s
 }
 
 void GIEngine::newImuProcess() {
-
+    if (init_status == 0) {
+        return;
+    }
     // 当前IMU时间作为系统当前状态时间,
     // set current IMU time as the current state time
     timestamp_ = imucur_.time;
@@ -166,7 +172,8 @@ void GIEngine::imuCompensate(IMU &imu) {
     accscale   = Eigen::Vector3d::Ones() + imuerror_.accscale;
     imu.dtheta = imu.dtheta.cwiseProduct(gyrscale.cwiseInverse());
     imu.dvel   = imu.dvel.cwiseProduct(accscale.cwiseInverse());
-}
+}  
+
 
 void GIEngine::insPropagation(IMU &imupre, IMU &imucur) {
 
@@ -358,6 +365,27 @@ int GIEngine::isToUpdate(double imutime1, double imutime2, double updatetime) co
     }
 }
 
+// 计算两点间方位角（单位：度）
+// Compute bearing angle between two GPS points (in degrees)
+double GIEngine::computeBearing(const GNSS& start, const GNSS& end) const {
+
+    double lat1 = start.blh[0];
+    double lon1 = start.blh[1];
+    double lat2 = end.blh[0];
+    double lon2 = end.blh[1];
+
+    // 使用大圆航线公式计算方位角
+    // Calculate bearing using great-circle formula
+    double dLon = lon2 - lon1;
+    double y = sin(dLon) * cos(lat2);
+    double x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon);
+    double bearing = atan2(y, x) * 180.0 / M_PI;
+    
+    // 规范化到0-360度范围
+    // Normalize to 0-360 degrees
+    return fmod((bearing + 360.0), 360.0);
+}
+
 void GIEngine::EKFPredict(Eigen::MatrixXd &Phi, Eigen::MatrixXd &Qd) {
 
     assert(Phi.rows() == Cov_.rows());
@@ -374,6 +402,59 @@ void GIEngine::EKFPredict(Eigen::MatrixXd &Phi, Eigen::MatrixXd &Qd) {
     dx_  = Phi * dx_;
 }
 
+void GIEngine::navi_init( ) {
+    if (init_status) {
+        return;
+    }
+    if (gnss_buffer.size() < GPS_BUFFER_CNT) {
+        return; // 等待更多的GNSS数据
+    }
+    std::vector<double> gpsdirection_list;
+    for (size_t i = GPS_BUFFER_CNT  - GNSS_DETECT_STRIGHT_TIME - 1; i < GPS_BUFFER_CNT; i++) {
+        for (size_t j = i + 1 ; j < GPS_BUFFER_CNT; j++) {
+            double gpsdirection = computeBearing(gnss_buffer[i], gnss_buffer[j]);
+            gpsdirection_list.push_back(gpsdirection);
+        }
+    }
+
+    for (size_t i = 0; i < gpsdirection_list.size(); i++) {
+        for (size_t j = 0; j < gpsdirection_list.size(); j++) {
+            if (j != i) {
+                if (abs(gpsdirection_list[i] - gpsdirection_list[j]) > 2.5) {
+                    return; // 不是直线
+                }
+            }
+        }
+    }
+    // 计算gpsdirection_list的总和
+    double sum = 0.0;
+    double average_direction = 0;
+    if (!gpsdirection_list.empty()) {
+        for (double direction : gpsdirection_list) {
+            sum += direction;
+        }
+        // 计算平均值
+        average_direction = sum / gpsdirection_list.size();
+    }
+// 假设 gps_speed 为 GPS 速度， average_direction 为 GPS 航向（单位：度）
+// 将航向转换为弧度
+    double gps_course_rad = average_direction * M_PI / 180.0;
+
+    // 分解速度为北向和东向分量，存在正负号区分
+    double north_velocity =  gnss_buffer.back().gps_speed * cos(gps_course_rad);
+    double east_velocity = gnss_buffer.back().gps_speed * sin(gps_course_rad);
+    // 姿态初始化
+    pvacur_.att.euler << 0, 0, average_direction * 3.14/180;
+    pvacur_.pos << gnss_buffer.back().blh[0] , gnss_buffer.back().blh[1] , gnss_buffer.back().blh[2];
+    std::cout << "init_BLH(deg deg m): "<<gnss_buffer.back().time << " "<<pvacur_.pos[0] << " " << pvacur_.pos[1] << " " << pvacur_.pos[2] << std::endl;
+    pvacur_.vel << north_velocity, east_velocity, 0;
+    pvacur_.att.cbn   = Rotation::euler2matrix(pvacur_.att.euler);
+    pvacur_.att.qbn   = Rotation::euler2quaternion(pvacur_.att.euler);
+    
+    pvapre_ = pvacur_;
+    init_status = true;
+
+}
 void GIEngine::EKFUpdate(Eigen::MatrixXd &dz, Eigen::MatrixXd &H, Eigen::MatrixXd &R) {
 
     assert(H.cols() == Cov_.rows());

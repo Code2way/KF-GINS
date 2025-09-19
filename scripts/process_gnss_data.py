@@ -74,13 +74,13 @@ def parse_gnss_log(input_file, output_file):
                         # 如果所有需要的数据都已获取，添加到结果列表
                         if all(v is not None for v in [current_timestamp, lat, lon, alt, lat_std, lon_std, alt_std]):
                             data.append([
-                                current_timestamp,
-                                lat,
-                                lon,
+                                round(float(current_timestamp), 3),
+                                round(lat, 6),
+                                round(lon, 6),
                                 alt,
-                                lat_std / 10,
-                                lon_std / 10,
-                                alt_std / 10,
+                                round(lat_std / 10, 3),
+                                round(lon_std / 10, 3),
+                                round(alt_std / 10, 3),
                                 hour,      # 时
                                 minute,    # 分
                                 second,    # 秒
@@ -103,5 +103,6 @@ def parse_gnss_log(input_file, output_file):
 
 # 使用函数
 input_file = '/mnt/d/GitHub/KF-GINS/bin/250227080530_000_Gnss.log'  # 输入文件名
-output_file = '/mnt/d/GitHub/KF-GINS/bin/gnss_data.txt'  # 输出文件名
+output_file = '/mnt/d/GitHub/KF-GINS/bin/gnss_data.txt'  # 输
+出文件名
 parse_gnss_log(input_file, output_file)
